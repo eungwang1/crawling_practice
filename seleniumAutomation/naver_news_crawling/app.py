@@ -1,13 +1,14 @@
-
-import requests
-from bs4 import BeautifulSoup
-import time
-from docx import Document
-from openpyxl import Workbook
-from openpyxl.styles import Alignment
-from tkinter import *
+import util
+import sys
+import os
 from tkinter import ttk
-import common.util
+from tkinter import *
+from openpyxl.styles import Alignment
+from openpyxl import Workbook
+from docx import Document
+import time
+from bs4 import BeautifulSoup
+import requests
 
 
 def lastPageCheck(soup: BeautifulSoup):
@@ -82,7 +83,7 @@ def crawlingSaveAsDoc():
             row, soup_page = naver_news_crawling(url, document, None, None)
             if lastPageCheck(soup_page) == True:
                 break
-        common.util.createDirectory('news')
+        util.createDirectory('news')
         document.save(f"./news/{keyword}.docx")
     except ValueError as e:
         print(e)
@@ -109,7 +110,7 @@ def crawlingSaveAsExcel():
             row, soup_page = naver_news_crawling(url, None, ws, row)
             if lastPageCheck(soup_page) == True:
                 break
-        common.util.createDirectory('news')
+        util.createDirectory('news')
         wb.save(f"./news/{keyword}.xlsx")
     except ValueError as e:
         print(e)

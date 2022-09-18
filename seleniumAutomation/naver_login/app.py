@@ -10,7 +10,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 import time
 import pyperclip
-import common.util
+import util
 
 # 환경변수 로드
 load_dotenv()
@@ -37,14 +37,14 @@ NAVER_PASSWORD = os.environ.get('NAVER_PASSWORD')
 id = driver.find_element(By.CSS_SELECTOR, "#id")
 id.click()
 pyperclip.copy(NAVER_ID)
-common.util.keydownAndPress("command", "v")
+util.keydownAndPress("command", "v")
 time.sleep(2)
 
 # 비밀번호 입력창
 pw = driver.find_element(By.CSS_SELECTOR, "#pw")
 pw.click()
 pyperclip.copy(NAVER_PASSWORD)
-common.util.keydownAndPress("command", "v")
+util.keydownAndPress("command", "v")
 time.sleep(2)
 
 # 로그인 버튼
