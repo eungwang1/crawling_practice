@@ -7,7 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment
 from tkinter import *
 from tkinter import ttk
-import util
+import common.util
 
 
 def lastPageCheck(soup: BeautifulSoup):
@@ -82,7 +82,7 @@ def crawlingSaveAsDoc():
             row, soup_page = naver_news_crawling(url, document, None, None)
             if lastPageCheck(soup_page) == True:
                 break
-        util.createDirectory('news')
+        common.util.createDirectory('news')
         document.save(f"./news/{keyword}.docx")
     except ValueError as e:
         print(e)
@@ -109,7 +109,7 @@ def crawlingSaveAsExcel():
             row, soup_page = naver_news_crawling(url, None, ws, row)
             if lastPageCheck(soup_page) == True:
                 break
-        util.createDirectory('news')
+        common.util.createDirectory('news')
         wb.save(f"./news/{keyword}.xlsx")
     except ValueError as e:
         print(e)
