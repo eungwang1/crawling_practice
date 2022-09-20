@@ -1,69 +1,88 @@
 
+from bz2 import compress
+from turtle import st
+from bs4 import BeautifulSoup
 from urllib.parse import quote
-from email import header
 from dotenv import load_dotenv
 import os
-import hmac
-import hashlib
 import requests
 import json
-from time import gmtime, strftime
+import time
 import pyautogui
-
-keyword = (pyautogui.prompt('키워드를 입력하세요'))
-limit = pyautogui.prompt('갯수를 입력하세요')
-keyword = quote(keyword)
-
-REQUEST_METHOD = "GET"
-DOMAIN = "https://api-gateway.coupang.com"
-URL = f"/v2/providers/affiliate_open_api/apis/openapi/v1/products/search?keyword={keyword}&limit={limit}"
+from util import generateHmac
+import pyperclip
 
 load_dotenv()
 ACCESS_KEY = os.environ.get('COUPANG_ACCESS_KEY')
 SECRET_KEY = os.environ.get('COUPANG_SECRET_KEY')
+COUPANG_DOMAIN = os.environ.get('COUPANG_DOMAIN')
+COUPANG_API_DEEPLINK = os.environ.get('COUPANG_API_DEEPLINK')
 
-REQUEST = {"coupangUrls": [
-    "https://www.coupang.com/np/search?component=&q=good&channel=user",
-    "https://www.coupang.com/np/coupangglobal"
-]}
-
-
-def generateHmac(method, url, secretKey, accessKey):
-    path, *query = url.split("?")
-    datetimeGMT = strftime('%y%m%d', gmtime()) + 'T' + \
-        strftime('%H%M%S', gmtime()) + 'Z'
-    message = datetimeGMT + method + path + (query[0] if query else "")
-
-    signature = hmac.new(bytes(secretKey, "utf-8"),
-                         message.encode("utf-8"),
-                         hashlib.sha256).hexdigest()
-
-    return "CEA algorithm=HmacSHA256, access-key={}, signed-date={}, signature={}".format(accessKey, datetimeGMT, signature)
-
-
-authorization = generateHmac(REQUEST_METHOD, URL, SECRET_KEY, ACCESS_KEY)
-headers = {
-    "Authorization": authorization,
-    "Content-Type": "application/json"
+user_header = {
+    'Host': 'www.coupang.com',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:76.0) Gecko/20100101 Firefox/76.0',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3',
 }
-url = "{}{}".format(DOMAIN, URL)
-response = requests.request(method=REQUEST_METHOD, url=url,
-                            headers={
-                                "Authorization": authorization,
-                                "Content-Type": "application/json"
-                            }
-                            )
 
-result = response.json()
-productData = result['data']['productData']
 
-for i in range(int(limit)):
-    productName = productData[i]["productName"]
-    productPrice = productData[i]["productPrice"]
-    productImage = productData[i]["productImage"]
-    print("=============이름============")
-    print(productName)
-    print("=============가격============")
-    print(productPrice)
-    print("=============사진============")
-    print(productImage)
+page = 1
+count = 0
+content = ''
+keyword = pyautogui.prompt('검색어를 입력해주세요.')
+total_count = int(pyautogui.prompt('상품의 갯수를 입력해주세요.'))
+while True:
+    if count == total_count:
+        break
+    response = requests.get(
+        f'https://www.coupang.com/np/search?component=&q={keyword}&channel=user&page={page}', headers=user_header)
+    page = page + 1
+    html_page = response.text
+    soup_page = BeautifulSoup(html_page, 'html.parser')
+    products = soup_page.select(".search-product-link")
+    for product in products:
+        if count == total_count:
+            break
+        isAd = product.select_one(".ad-badge-text")
+        isBestSeller = product.select_one(".best-seller-search-product-wrap")
+        if isAd or isBestSeller:
+            continue
+        product_url = product.attrs['href']
+        response = requests.get(
+            f"https://www.coupang.com{product_url}", headers=user_header)
+        product_url = response.url
+        html_detail = response.text
+        soup_detail = BeautifulSoup(html_detail, "html.parser")
+        star_width = soup_detail.select_one(".rating-star-num").attrs['style']
+        startIndex = star_width.index(": ") + 1
+        endIndex = star_width.index(".")
+        star_width = star_width[startIndex:endIndex]
+        score = int(star_width)*5/100
+        score_count = soup_detail.select_one("span.count").text.strip()
+        brand_name = soup_detail.select_one(".prod-brand-name").text.strip()
+        product_name = soup_detail.select_one(
+            ".prod-buy-header__title").text.strip()
+        proudct_price = soup_detail.select_one(".total-price").text.strip()
+
+        REQUEST = {"coupangUrls": [product_url]}
+        authorization = generateHmac(
+            "POST", COUPANG_API_DEEPLINK, SECRET_KEY, ACCESS_KEY)
+        partners_header = {
+            "Authorization": authorization,
+            "Content-Type": "application/json"
+        }
+        url = "{}{}".format(COUPANG_DOMAIN, COUPANG_API_DEEPLINK)
+        try:
+            response = requests.request(
+                method="POST", url=url, headers=partners_header, data=json.dumps(REQUEST))
+            result = response.json()
+            partners_url = result['data'][0]['shortenUrl']
+            count = count + 1
+            content += f"{str(count)}.{product_name}\n별점:{score}({score_count})\n{partners_url}\n\n"
+            time.sleep(0.3)
+        except KeyError:
+            print(f'error : {KeyError}')
+            print(f'url : {response.url}')
+content += '\n포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.'
+pyperclip.copy(content)
+print(content)
